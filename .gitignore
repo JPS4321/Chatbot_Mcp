@@ -1,0 +1,9 @@
+# Entorno virtual
+.venv/
+venv/
+
+# Variables de entorno
+.env
+
+# Configuración local
+servers.yaml
