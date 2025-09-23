@@ -1,9 +1,19 @@
-# Entorno virtual
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
 .venv/
-venv/
-
-# Variables de entorno
 .env
+
+# Logs
+logs/*
+!.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Configuración local
 servers.yaml
