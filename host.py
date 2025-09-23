@@ -12,7 +12,7 @@ from mcp.client.stdio import stdio_client
 from mcp.client.session import ClientSession
 
 CONFIG_FILE = "servers.yaml"
-SERVER_KEY = "git_server"  # change this key for other MCP servers
+SERVER_KEY = "remote_echo"  
 OPENAI_MODEL = "gpt-4o-mini"
 
 # ---- Load API Key ----
