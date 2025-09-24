@@ -1,6 +1,53 @@
 {
   "server": "remote_echo",
-  "history": [],
-  "last_tool_memory": {},
+  "history": [
+    {
+      "timestamp": "2025-09-23T19:26:17.565638",
+      "user": "12 + 1",
+      "tool_used": "sum",
+      "arguments": {
+        "params": {
+          "a": 12,
+          "b": 1
+        }
+      },
+      "tool_output": "{\n  \"result\": 13.0\n}",
+      "final_answer": "The result is 13.0."
+    },
+    {
+      "timestamp": "2025-09-23T19:26:36.543541",
+      "user": "1+12",
+      "tool_used": "sum",
+      "arguments": {
+        "params": {
+          "a": 1,
+          "b": 12
+        }
+      },
+      "tool_output": "{\n  \"result\": 13.0\n}",
+      "final_answer": "The result is 13.0."
+    },
+    {
+      "timestamp": "2025-09-23T19:26:45.361567",
+      "user": "1 sumado a 12",
+      "tool_used": "sum",
+      "arguments": {
+        "params": {
+          "a": 1,
+          "b": 12
+        }
+      },
+      "tool_output": "{\n  \"result\": 13.0\n}",
+      "final_answer": "The result is 13.0."
+    }
+  ],
+  "last_tool_memory": {
+    "sum": {
+      "params": {
+        "a": 1,
+        "b": 12
+      }
+    }
+  },
   "last_list": null
 }

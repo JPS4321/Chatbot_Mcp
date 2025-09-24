@@ -15,7 +15,7 @@ CONFIG_FILE = "servers.yaml"
 SERVER_KEY = "remote_echo"  
 OPENAI_MODEL = "gpt-4o-mini"
 
-# ---- Load API Key ----
+# Load API Key
 load_dotenv()
 if not os.getenv("OPENAI_API_KEY"):
     raise SystemExit("Missing OPENAI_API_KEY in .env")
@@ -34,21 +34,21 @@ with open(CONTEXT_FILE, "w", encoding="utf-8") as f:
 
 conversation_history: List[Dict[str, str]] = []
 
-# ---------------------- Context helpers ----------------------
+# Herramientas de contexto
 def save_to_context(entry: Dict[str, Any]):
     with open(CONTEXT_FILE, "r+", encoding="utf-8") as f:
         data = json.load(f)
         data["history"].append(entry)
-        # Remember last arguments per tool
+        # Recordar ultima tool utilizada
         if entry.get("tool_used") and entry.get("arguments"):
             data["last_tool_memory"][entry["tool_used"]] = entry["arguments"]
-        # Optionally store last list entities if provided by the entry
+        # Guardar lista si el output fue ese
         if entry.get("last_list"):
             data["last_list"] = entry["last_list"]
         f.seek(0)
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.truncate()
-
+# Devuelve los ultimos argumentos en caso se usaron con una herramienta especifica
 def get_last_args_for_tool(tool_name: Optional[str]) -> Optional[Dict[str, Any]]:
     if not tool_name:
         return None
@@ -58,7 +58,7 @@ def get_last_args_for_tool(tool_name: Optional[str]) -> Optional[Dict[str, Any]]
             return data["last_tool_memory"].get(tool_name)
     except FileNotFoundError:
         return None
-
+#Recupera la ultima lista usada (Esto para cosas como el primero, segundo,etc)
 def get_last_list() -> Optional[Dict[str, Any]]:
     try:
         with open(CONTEXT_FILE, "r", encoding="utf-8") as f:
@@ -66,12 +66,12 @@ def get_last_list() -> Optional[Dict[str, Any]]:
             return data.get("last_list")
     except FileNotFoundError:
         return None
-
+#Guardar cada interaccion en un archivo .txt
 def log_interaction(entry: Dict[str, Any]):
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-# ---------------------- Tool selection prompt ----------------------
+#  Tool selection prompt  (En ingles porque mi base de datos esta en ingles :D)
 TOOL_SELECTION_SYSTEM = """You are an MCP tool orchestrator.
 You will receive a list of available tools (name, description and JSON schema).
 Your task: Given a user input, select ONE tool and construct a JSON object of arguments
@@ -83,7 +83,7 @@ Rules:
 - Respond ONLY with JSON:
 { "tool_name": string|null, "arguments": object, "reasoning_summary": string }
 """
-
+#String de herramientas expuestas disponibles
 def build_tools_catalog(tools_resp) -> str:
     lines = []
     for t in tools_resp.tools:
@@ -91,10 +91,12 @@ def build_tools_catalog(tools_resp) -> str:
         lines.append(f"- name: {t.name}\n  desc: {t.description}\n  schema: {schema_str}")
     return "\n".join(lines)
 
-# Keep parsed schemas for argument auto-fill
+# Crea un diccionario que mapea el nombre de cada herramienta con su esquema JSON de argumentos.
+#Se usa para saber qué campos esperan las herramientas.
 def index_tool_schemas(tools_resp) -> Dict[str, Dict[str, Any]]:
     return {t.name: t.inputSchema for t in tools_resp.tools}
 
+#Pregutna al modelo que herramienta deberia usar y le dal el mensaje del usuario
 def ask_model_for_tool(user_message: str, tools_catalog: str) -> Dict[str, Any]:
     prompt = f"""Available tools:
 {tools_catalog}
@@ -116,7 +118,7 @@ Return ONLY a JSON with: tool_name, arguments, reasoning_summary.
         return json.loads(text)
     except Exception:
         return {"tool_name": None, "arguments": {}, "reasoning_summary": "Could not parse model output."}
-
+#Pide al modelo que transforme la salida de una herramienta en un texto tipo parrafos.
 def ask_model_for_final_answer(tool_output_text: str) -> str:
     system = "Turn tool outputs into clear, concise explanations in English. Use ONLY the information in the output."
     prompt = f"""Tool output:
@@ -133,6 +135,7 @@ Rewrite this information in a user-friendly way.
         temperature=0.0,
     )
     return resp.choices[0].message.content.strip()
+#Se usa cuando no hay ninguna herramienta adecuada. Siemplemente dice que no hay una tool y da una respuesta generica
 
 def ask_model_basic_fallback(user_message: str) -> str:
     system = (
@@ -165,7 +168,7 @@ ORDINAL_PATTERNS = [
     re.compile(r"\bno\.\s*(\d+)\b", re.I),                # no. 2
     re.compile(r"(?:^|#)\s*(\d+)\b"),                     # #1 or leading 1
 ]
-
+# Detecta si un texto contiene un  y devuelve el índice cero-based (0 para first, 1 para second, etc.)
 def parse_ordinal_index(text: str) -> Optional[int]:
     """Return zero-based index if an ordinal is detected, else None."""
     low = text.lower()
@@ -195,7 +198,7 @@ def pick_entity_key(items: List[Dict[str, Any]]) -> Optional[str]:
         if all(isinstance(it.get(k), (str, int, float)) for it in items):
             return k
     return None
-
+#Intenta interpretar la salida de una herramienta como JSON con un campo results.
 def extract_list_entities_from_tool_output(tool_output_text: str) -> Optional[Dict[str, Any]]:
     """If tool output looks like JSON with a 'results' list, extract representative labels."""
     try:
@@ -217,7 +220,7 @@ def extract_list_entities_from_tool_output(tool_output_text: str) -> Optional[Di
     # list of scalars
     labels = [str(x) for x in results]
     return {"entity_key": None, "labels": labels}
-
+#Busca dentro del esquema de argumentos de una herramienta el campo preferido para inyectar valores de entidades (name, id, title).
 def preferred_arg_key_for_tool(schema: Dict[str, Any]) -> Optional[str]:
     """Choose a preferred argument name to fill (name > id > title)."""
     try:
@@ -228,7 +231,7 @@ def preferred_arg_key_for_tool(schema: Dict[str, Any]) -> Optional[str]:
     except Exception:
         pass
     return None
-
+#Si el usuario dice primero y asi, toma la lista más reciente
 def resolve_ordinal_reference_in_args(
     user_msg: str,
     tool_name: Optional[str],
@@ -260,7 +263,8 @@ def resolve_ordinal_reference_in_args(
         tool_args[arg_key] = labels[idx]
     return tool_args
 
-# ---------------------- Main ----------------------
+#  Main 
+#Aqui es el flujo basico
 async def main():
     cfg = yaml.safe_load(open(CONFIG_FILE, "r", encoding="utf-8"))
     if "servers" not in cfg or SERVER_KEY not in cfg["servers"]:
@@ -272,7 +276,7 @@ async def main():
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            print(f"🤝 Connected to MCP server: {SERVER_KEY}")
+            print(f" Connected to MCP server: {SERVER_KEY}")
             tools = await session.list_tools()
             tool_names = [t.name for t in tools.tools]
             tools_catalog = build_tools_catalog(tools)
@@ -286,7 +290,7 @@ async def main():
                 if not user_msg:
                     continue
                 if user_msg in ("exit", "quit"):
-                    print("👋 Goodbye")
+                    print(" Goodbye")
                     break
                 if user_msg == "tools":
                     print(tools_catalog)
